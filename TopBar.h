@@ -84,6 +84,7 @@ private:
     QFrame* createSeparator();
     void setupUI();
     void applyPlatformBlur();
+    void updateMask();
 
     QHBoxLayout* m_layout;
     ToolButton* m_langSwitcher;

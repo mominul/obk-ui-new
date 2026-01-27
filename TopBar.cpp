@@ -401,6 +401,18 @@ void TopBar::paintEvent(QPaintEvent* event)
 void TopBar::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
+    updateMask();
+}
+
+void TopBar::updateMask()
+{
+    // Set a pill-shaped mask so the acrylic blur effect on Windows
+    // is clipped to the pill shape instead of filling the entire rectangle.
+    QRectF r = QRectF(rect());
+    qreal radius = r.height() / 2.0;
+    QPainterPath path;
+    path.addRoundedRect(r, radius, radius);
+    setMask(path.toFillPolygon().toPolygon());
 }
 
 void TopBar::enableBlur()
