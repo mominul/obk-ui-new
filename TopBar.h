@@ -96,6 +96,9 @@ private:
     // Drag state
     bool m_isDragging = false;
     QPoint m_dragOffset;
+
+    // Platform blur state
+    bool m_blurEnabled = false;
 };
 
 #endif // TOPBAR_H

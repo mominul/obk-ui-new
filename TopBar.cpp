@@ -390,8 +390,11 @@ void TopBar::paintEvent(QPaintEvent* event)
     qreal radius = r.height() / 2.0;  // Perfect pill shape
     path.addRoundedRect(r, radius, radius);
 
-    // Fill with acrylic tint
-    painter.fillPath(path, FluentDesign::AcrylicTintDark);
+    // On Windows, the DWM GradientColor already provides the acrylic tint,
+    // so we only paint it ourselves on other platforms or if blur failed.
+    if (!m_blurEnabled) {
+        painter.fillPath(path, FluentDesign::AcrylicTintDark);
+    }
 
     // Draw subtle border
     painter.setPen(QPen(FluentDesign::BorderStrong, 1));
@@ -423,37 +426,58 @@ void TopBar::enableBlur()
 void TopBar::applyPlatformBlur()
 {
 #ifdef Q_OS_WIN
-    // Windows 10/11 Acrylic Blur using SetWindowCompositionAttribute
     HWND hwnd = reinterpret_cast<HWND>(winId());
 
-    HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
-    if (hUser32) {
-        pfnSetWindowCompositionAttribute setWindowCompositionAttribute =
-            (pfnSetWindowCompositionAttribute)GetProcAddress(hUser32, "SetWindowCompositionAttribute");
+    // Try Windows 11 approach first: DWMWA_SYSTEMBACKDROP_TYPE
+    // Value 3 = DWMSBT_TRANSIENTWINDOW (acrylic for transient/popup windows)
+    const DWORD DWMWA_SYSTEMBACKDROP_TYPE = 38;
+    DWORD backdropType = 3; // DWMSBT_TRANSIENTWINDOW (acrylic)
+    HRESULT hr = DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE,
+                                        &backdropType, sizeof(backdropType));
 
-        if (setWindowCompositionAttribute) {
-            ACCENTPOLICY accent = {0};
-            accent.AccentState = 4;  // ACCENT_ENABLE_ACRYLICBLURBEHIND
-            accent.AccentFlags = 2;  // ACCENT_ENABLE_TRANSPARENTGRADIENT
-            // Gradient color: AABBGGRR format (alpha, blue, green, red)
-            accent.GradientColor = 0xA6202020; // Dark tint with ~65% alpha
+    if (SUCCEEDED(hr)) {
+        // Extend frame into client area (required for system backdrop)
+        MARGINS margins = {-1, -1, -1, -1};
+        DwmExtendFrameIntoClientArea(hwnd, &margins);
+        m_blurEnabled = true;
+    } else {
+        // Fallback: Windows 10 Acrylic Blur using SetWindowCompositionAttribute
+        HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
+        if (hUser32) {
+            pfnSetWindowCompositionAttribute setWindowCompositionAttribute =
+                (pfnSetWindowCompositionAttribute)GetProcAddress(hUser32, "SetWindowCompositionAttribute");
 
-            WINDOWCOMPOSITIONATTRIBDATA data = {0};
-            data.Attribute = 19;  // WCA_ACCENT_POLICY
-            data.Data = &accent;
-            data.SizeOfData = sizeof(accent);
+            if (setWindowCompositionAttribute) {
+                ACCENTPOLICY accent = {0};
+                accent.AccentState = 4;  // ACCENT_ENABLE_ACRYLICBLURBEHIND
+                accent.AccentFlags = 2;  // ACCENT_ENABLE_TRANSPARENTGRADIENT
+                accent.GradientColor = 0xA6202020; // AABBGGRR: dark tint ~65% alpha
 
-            setWindowCompositionAttribute(hwnd, &data);
+                WINDOWCOMPOSITIONATTRIBDATA data = {0};
+                data.Attribute = 19;  // WCA_ACCENT_POLICY
+                data.Data = &accent;
+                data.SizeOfData = sizeof(accent);
 
-            // Enable dark mode
-            data.Attribute = 26;  // WCA_USEDARKMODECOLORS
-            setWindowCompositionAttribute(hwnd, &data);
+                setWindowCompositionAttribute(hwnd, &data);
+
+                // Enable dark mode
+                data.Attribute = 26;  // WCA_USEDARKMODECOLORS
+                setWindowCompositionAttribute(hwnd, &data);
+
+                m_blurEnabled = true;
+            }
         }
+
+        // Extend frame into client area for better blur effect
+        MARGINS margins = {-1, -1, -1, -1};
+        DwmExtendFrameIntoClientArea(hwnd, &margins);
     }
 
-    // Extend frame into client area for better blur effect
-    MARGINS margins = {-1, -1, -1, -1};
-    DwmExtendFrameIntoClientArea(hwnd, &margins);
+    // Enable dark mode window border (Windows 11)
+    const DWORD DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    BOOL darkMode = TRUE;
+    DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE,
+                          &darkMode, sizeof(darkMode));
 
 #elif defined(Q_OS_MAC)
     // macOS blur using NSVisualEffectView is handled in Objective-C++
