@@ -307,7 +307,7 @@ void TopBar::setupUI()
     m_layout->setSpacing(8);
 
     // Language Switcher (drag handle)
-    m_langSwitcher = new ToolButton(QString::fromUtf8("\u0985"), "IME Switcher (Drag to move)", true, this);
+    m_langSwitcher = new ToolButton(QString::fromUtf8("অ"), "IME Switcher (Drag to move)", true, this);
     connect(m_langSwitcher, &ToolButton::clicked, this, &TopBar::languageSwitcherClicked);
     connect(m_langSwitcher, &ToolButton::dragStarted, this, &TopBar::onDragStarted);
     connect(m_langSwitcher, &ToolButton::dragging, this, &TopBar::onDragging);
