@@ -288,14 +288,16 @@ void ToolButton::mouseReleaseEvent(QMouseEvent* event)
 TopBar::TopBar(QWidget* parent)
     : QWidget(parent)
 {
+#ifndef Q_OS_WIN
+    // On macOS/Linux, use Qt's translucent background for transparency.
+    // On Windows, we skip this because WA_TranslucentBackground sets WS_EX_LAYERED
+    // which is incompatible with DWM blur/acrylic composition.
+    // The window mask + DWM accent policy handles everything on Windows.
     setAttribute(Qt::WA_TranslucentBackground);
+#endif
     setWindowFlags(Qt::FramelessWindowHint | Qt::Tool | Qt::WindowStaysOnTopHint);
 
     setupUI();
-
-    // Note: Do NOT use QGraphicsDropShadowEffect on the parent widget
-    // as it prevents child widgets from rendering properly.
-    // Shadow is drawn manually in paintEvent instead.
 }
 
 TopBar::~TopBar() = default;
@@ -418,9 +420,23 @@ void TopBar::updateMask()
     setMask(path.toFillPolygon().toPolygon());
 }
 
+void TopBar::showEvent(QShowEvent* event)
+{
+    QWidget::showEvent(event);
+    // Apply blur after the window is shown, so the native HWND is fully set up
+    // and Qt won't overwrite our window style changes.
+    if (!m_blurEnabled) {
+        applyPlatformBlur();
+    }
+}
+
 void TopBar::enableBlur()
 {
+    // On Windows, blur is applied in showEvent after the HWND is ready.
+    // On other platforms, apply immediately.
+#ifndef Q_OS_WIN
     applyPlatformBlur();
+#endif
 }
 
 void TopBar::applyPlatformBlur()
@@ -428,24 +444,9 @@ void TopBar::applyPlatformBlur()
 #ifdef Q_OS_WIN
     HWND hwnd = reinterpret_cast<HWND>(winId());
 
-    // Remove WS_EX_LAYERED style set by Qt::WA_TranslucentBackground.
-    // Layered windows are incompatible with DWM blur/acrylic composition.
-    // The pill-shaped window mask (setMask) handles the non-rectangular shape.
-    LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
-    exStyle &= ~WS_EX_LAYERED;
-    SetWindowLongPtr(hwnd, GWL_EXSTYLE, exStyle);
-
-    // Extend frame into client area (required for DWM blur to show through)
-    MARGINS margins = {-1, -1, -1, -1};
-    DwmExtendFrameIntoClientArea(hwnd, &margins);
-
-    // Enable blur behind the window using the standard DWM API
-    DWM_BLURBEHIND bb = {0};
-    bb.dwFlags = DWM_BB_ENABLE;
-    bb.fEnable = TRUE;
-    DwmEnableBlurBehindWindow(hwnd, &bb);
-
-    // Apply accent policy for acrylic tint via SetWindowCompositionAttribute
+    // Apply accent policy for blur + tint via SetWindowCompositionAttribute.
+    // This works on Windows 10 1803+ and Windows 11 without needing
+    // WS_EX_LAYERED (which we avoid by not setting WA_TranslucentBackground).
     HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
     if (hUser32) {
         pfnSetWindowCompositionAttribute setWindowCompositionAttribute =

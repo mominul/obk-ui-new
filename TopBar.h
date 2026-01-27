@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QFrame>
 #include <QPoint>
+#include <QShowEvent>
 
 // Icon types for tool buttons
 enum class IconType {
@@ -67,6 +68,7 @@ public:
 protected:
     void paintEvent(QPaintEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
+    void showEvent(QShowEvent* event) override;
 
 signals:
     void languageSwitcherClicked();
