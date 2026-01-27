@@ -428,49 +428,48 @@ void TopBar::applyPlatformBlur()
 #ifdef Q_OS_WIN
     HWND hwnd = reinterpret_cast<HWND>(winId());
 
-    // Try Windows 11 approach first: DWMWA_SYSTEMBACKDROP_TYPE
-    // Value 3 = DWMSBT_TRANSIENTWINDOW (acrylic for transient/popup windows)
-    const DWORD DWMWA_SYSTEMBACKDROP_TYPE = 38;
-    DWORD backdropType = 3; // DWMSBT_TRANSIENTWINDOW (acrylic)
-    HRESULT hr = DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE,
-                                        &backdropType, sizeof(backdropType));
+    // Remove WS_EX_LAYERED style set by Qt::WA_TranslucentBackground.
+    // Layered windows are incompatible with DWM blur/acrylic composition.
+    // The pill-shaped window mask (setMask) handles the non-rectangular shape.
+    LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+    exStyle &= ~WS_EX_LAYERED;
+    SetWindowLongPtr(hwnd, GWL_EXSTYLE, exStyle);
 
-    if (SUCCEEDED(hr)) {
-        // Extend frame into client area (required for system backdrop)
-        MARGINS margins = {-1, -1, -1, -1};
-        DwmExtendFrameIntoClientArea(hwnd, &margins);
-        m_blurEnabled = true;
-    } else {
-        // Fallback: Windows 10 Acrylic Blur using SetWindowCompositionAttribute
-        HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
-        if (hUser32) {
-            pfnSetWindowCompositionAttribute setWindowCompositionAttribute =
-                (pfnSetWindowCompositionAttribute)GetProcAddress(hUser32, "SetWindowCompositionAttribute");
+    // Extend frame into client area (required for DWM blur to show through)
+    MARGINS margins = {-1, -1, -1, -1};
+    DwmExtendFrameIntoClientArea(hwnd, &margins);
 
-            if (setWindowCompositionAttribute) {
-                ACCENTPOLICY accent = {0};
-                accent.AccentState = 4;  // ACCENT_ENABLE_ACRYLICBLURBEHIND
-                accent.AccentFlags = 2;  // ACCENT_ENABLE_TRANSPARENTGRADIENT
-                accent.GradientColor = 0xA6202020; // AABBGGRR: dark tint ~65% alpha
+    // Enable blur behind the window using the standard DWM API
+    DWM_BLURBEHIND bb = {0};
+    bb.dwFlags = DWM_BB_ENABLE;
+    bb.fEnable = TRUE;
+    DwmEnableBlurBehindWindow(hwnd, &bb);
 
-                WINDOWCOMPOSITIONATTRIBDATA data = {0};
-                data.Attribute = 19;  // WCA_ACCENT_POLICY
-                data.Data = &accent;
-                data.SizeOfData = sizeof(accent);
+    // Apply accent policy for acrylic tint via SetWindowCompositionAttribute
+    HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
+    if (hUser32) {
+        pfnSetWindowCompositionAttribute setWindowCompositionAttribute =
+            (pfnSetWindowCompositionAttribute)GetProcAddress(hUser32, "SetWindowCompositionAttribute");
 
-                setWindowCompositionAttribute(hwnd, &data);
+        if (setWindowCompositionAttribute) {
+            ACCENTPOLICY accent = {0};
+            accent.AccentState = 3;  // ACCENT_ENABLE_BLURBEHIND
+            accent.AccentFlags = 2;  // ACCENT_ENABLE_TRANSPARENTGRADIENT
+            accent.GradientColor = 0xA6202020; // AABBGGRR: dark tint ~65% alpha
 
-                // Enable dark mode
-                data.Attribute = 26;  // WCA_USEDARKMODECOLORS
-                setWindowCompositionAttribute(hwnd, &data);
+            WINDOWCOMPOSITIONATTRIBDATA data = {0};
+            data.Attribute = 19;  // WCA_ACCENT_POLICY
+            data.Data = &accent;
+            data.SizeOfData = sizeof(accent);
 
-                m_blurEnabled = true;
-            }
+            setWindowCompositionAttribute(hwnd, &data);
+
+            // Enable dark mode colors
+            data.Attribute = 26;  // WCA_USEDARKMODECOLORS
+            setWindowCompositionAttribute(hwnd, &data);
+
+            m_blurEnabled = true;
         }
-
-        // Extend frame into client area for better blur effect
-        MARGINS margins = {-1, -1, -1, -1};
-        DwmExtendFrameIntoClientArea(hwnd, &margins);
     }
 
     // Enable dark mode window border (Windows 11)
