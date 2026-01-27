@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows Acrylic UI - Light & Dark</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            /* Windows 11 Fluent Design Tokens - Dark (Default) */
+            --acrylic-bg: rgba(32, 32, 32, 0.7);
+            --acrylic-blur: 30px;
+            --acrylic-saturate: 150%;
+            --border-subtle: rgba(255, 255, 255, 0.1);
+            --border-strong: rgba(255, 255, 255, 0.15);
+            --text-primary: #ffffff;
+            --hover-bg: rgba(255, 255, 255, 0.1);
+            --accent-red: #d13438;
+            --font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+            --app-bg: url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=2560&auto=format&fit=crop');
+        }
+
+        /* Light Mode Tokens */
+        body.light-mode {
+            --acrylic-bg: rgba(255, 255, 255, 0.7);
+            --border-subtle: rgba(0, 0, 0, 0.08);
+            --border-strong: rgba(0, 0, 0, 0.12);
+            --text-primary: #1c1c1c;
+            --hover-bg: rgba(0, 0, 0, 0.05);
+            --app-bg: url('https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=2560&auto=format&fit=crop');
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            transition: background-color 0.4s ease, color 0.4s ease;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-family);
+            background: var(--app-bg);
+            background-size: cover;
+            background-position: center;
+            overflow: hidden;
+        }
+
+        /* Theme Toggle Button */
+        .theme-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: var(--acrylic-bg);
+            backdrop-filter: blur(var(--acrylic-blur)) saturate(var(--acrylic-saturate));
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        /* Main Toolbar */
+        .acrylic-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: var(--acrylic-bg);
+            backdrop-filter: blur(var(--acrylic-blur)) saturate(var(--acrylic-saturate));
+            -webkit-backdrop-filter: blur(var(--acrylic-blur)) saturate(var(--acrylic-saturate));
+            border: 1px solid var(--border-subtle);
+            border-radius: 100px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        /* Border highlights for depth */
+        .acrylic-toolbar::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 100px;
+            border: 1px solid var(--border-strong);
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        .tool-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-primary);
+            position: relative;
+        }
+
+        .tool-button:hover {
+            background: var(--hover-bg);
+        }
+
+        .tool-button:active {
+            transform: scale(0.94);
+        }
+
+        /* Language Switcher */
+        .lang-switcher {
+            background: var(--accent-red);
+            color: white !important;
+            font-weight: 600;
+            font-size: 15px;
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(209, 52, 56, 0.3);
+        }
+
+        .lang-switcher:hover {
+            filter: brightness(1.1);
+            background: var(--accent-red);
+        }
+
+        .separator {
+            width: 1px;
+            height: 24px;
+            background: var(--border-strong);
+            margin: 0 4px;
+            opacity: 0.5;
+        }
+
+        /* Tooltip */
+        .tool-button::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 54px;
+            background: var(--acrylic-bg);
+            backdrop-filter: blur(10px);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: all 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+            pointer-events: none;
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .tool-button:hover::after {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .label-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: var(--text-primary);
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+    </style>
+</head>
+<body>
+
+    <button class="theme-toggle" onclick="toggleTheme()">
+        <i data-lucide="sun" id="theme-icon"></i>
+        <span id="theme-text">Switch to Light Mode</span>
+    </button>
+
+    <div class="label-container">
+        Fluent Design: Acrylic Material
+    </div>
+
+    <nav class="acrylic-toolbar">
+        <div class="tool-button lang-switcher" data-tooltip="Switch Language">
+            অ
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="tool-button" data-tooltip="Display Mode">
+            <i data-lucide="monitor"></i>
+        </div>
+
+        <div class="tool-button" data-tooltip="Keyboard Layout">
+            <i data-lucide="keyboard"></i>
+        </div>
+
+        <div class="tool-button" data-tooltip="System Settings">
+            <i data-lucide="settings"></i>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="tool-button" data-tooltip="Power Menu">
+            <i data-lucide="power" style="color: #ff4d4d;"></i>
+        </div>
+    </nav>
+
+    <script>
+        lucide.createIcons();
+
+        function toggleTheme() {
+            const body = document.body;
+            const themeText = document.getElementById('theme-text');
+            const themeIcon = document.getElementById('theme-icon');
+            
+            body.classList.toggle('light-mode');
+            
+            if (body.classList.contains('light-mode')) {
+                themeText.innerText = "Switch to Dark Mode";
+                themeIcon.setAttribute('data-lucide', 'moon');
+            } else {
+                themeText.innerText = "Switch to Light Mode";
+                themeIcon.setAttribute('data-lucide', 'sun');
+            }
+            
+            lucide.createIcons();
+        }
+    </script>
+</body>
+</html>

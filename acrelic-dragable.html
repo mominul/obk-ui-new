@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Draggable Windows Acrylic UI</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            /* Windows 11 Fluent Design Tokens - Dark */
+            --acrylic-bg: rgba(32, 32, 32, 0.75);
+            --acrylic-blur: 30px;
+            --acrylic-saturate: 150%;
+            --border-subtle: rgba(255, 255, 255, 0.1);
+            --border-strong: rgba(255, 255, 255, 0.15);
+            --text-primary: #ffffff;
+            --hover-bg: rgba(255, 255, 255, 0.1);
+            --accent-red: #d13438;
+            --font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+            --app-bg: url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=2560&auto=format&fit=crop');
+            --shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        body.light-mode {
+            --acrylic-bg: rgba(255, 255, 255, 0.7);
+            --border-subtle: rgba(0, 0, 0, 0.08);
+            --border-strong: rgba(0, 0, 0, 0.12);
+            --text-primary: #1c1c1c;
+            --hover-bg: rgba(0, 0, 0, 0.05);
+            --app-bg: url('https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=2560&auto=format&fit=crop');
+            --shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-family);
+            background: var(--app-bg);
+            background-size: cover;
+            background-position: center;
+            overflow: hidden;
+            transition: background 0.5s ease;
+        }
+
+        .theme-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: var(--acrylic-bg);
+            backdrop-filter: blur(var(--acrylic-blur)) saturate(var(--acrylic-saturate));
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        /* Main Draggable Toolbar */
+        .acrylic-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 14px 6px 8px;
+            background: var(--acrylic-bg);
+            backdrop-filter: blur(var(--acrylic-blur)) saturate(var(--acrylic-saturate));
+            -webkit-backdrop-filter: blur(var(--acrylic-blur)) saturate(var(--acrylic-saturate));
+            border: 1px solid var(--border-subtle);
+            border-radius: 100px;
+            box-shadow: var(--shadow);
+            position: absolute;
+            cursor: grab;
+            transition: transform 0.2s cubic-bezier(0.2, 0, 0.2, 1), box-shadow 0.2s;
+            z-index: 50;
+            touch-action: none; /* Critical for mobile dragging */
+        }
+
+        .acrylic-toolbar:active {
+            cursor: grabbing;
+            transform: scale(1.02);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Drag Handle Affordance */
+        .drag-handle {
+            padding: 0 8px;
+            color: var(--text-primary);
+            opacity: 0.4;
+            display: flex;
+            align-items: center;
+        }
+
+        .tool-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-primary);
+            position: relative;
+            transition: background 0.2s;
+        }
+
+        /* Prevent clicking button from triggering drag if we want strictly icons for interaction */
+        .tool-button:hover {
+            background: var(--hover-bg);
+        }
+
+        .lang-switcher {
+            background: var(--accent-red);
+            color: white !important;
+            font-weight: 600;
+            font-size: 15px;
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+        }
+
+        .separator {
+            width: 1px;
+            height: 24px;
+            background: var(--border-strong);
+            margin: 0 4px;
+            opacity: 0.5;
+        }
+
+        /* Tooltips */
+        .tool-button::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 54px;
+            background: var(--acrylic-bg);
+            backdrop-filter: blur(10px);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: all 0.15s ease;
+            pointer-events: none;
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .tool-button:hover::after {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .instruction {
+            position: absolute;
+            bottom: 40px;
+            color: var(--text-primary);
+            opacity: 0.6;
+            font-size: 14px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <button class="theme-toggle" onclick="toggleTheme()">
+        <i data-lucide="sun" id="theme-icon"></i>
+        <span id="theme-text">Light Mode</span>
+    </button>
+
+    <div class="instruction">Click and drag the toolbar to move it</div>
+
+    <nav id="toolbar" class="acrylic-toolbar">
+        <!-- Drag Handle Icon -->
+        <div class="drag-handle">
+            <i data-lucide="grip-vertical" style="width: 18px;"></i>
+        </div>
+
+        <div class="tool-button lang-switcher" data-tooltip="Language">
+            অ
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="tool-button" data-tooltip="Monitor Settings">
+            <i data-lucide="monitor"></i>
+        </div>
+
+        <div class="tool-button" data-tooltip="Keyboard Layout">
+            <i data-lucide="keyboard"></i>
+        </div>
+
+        <div class="tool-button" data-tooltip="Settings">
+            <i data-lucide="settings"></i>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="tool-button" data-tooltip="Power">
+            <i data-lucide="power" style="color: #ff4d4d;"></i>
+        </div>
+    </nav>
+
+    <script>
+        lucide.createIcons();
+
+        // Theme Toggle Logic
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            document.getElementById('theme-text').innerText = isLight ? "Dark Mode" : "Light Mode";
+            document.getElementById('theme-icon').setAttribute('data-lucide', isLight ? 'moon' : 'sun');
+            lucide.createIcons();
+        }
+
+        // Dragging Logic
+        const toolbar = document.getElementById('toolbar');
+        let isDragging = false;
+        let offsetX, offsetY;
+
+        // Initialize position to center
+        toolbar.style.left = (window.innerWidth / 2 - toolbar.offsetWidth / 2) + 'px';
+        toolbar.style.top = (window.innerHeight / 2 - toolbar.offsetHeight / 2) + 'px';
+
+        toolbar.addEventListener('mousedown', startDrag);
+        toolbar.addEventListener('touchstart', startDrag, { passive: false });
+
+        function startDrag(e) {
+            // Don't drag if we're clicking a button specifically
+            if (e.target.closest('.tool-button')) return;
+
+            isDragging = true;
+            const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+
+            const rect = toolbar.getBoundingClientRect();
+            offsetX = clientX - rect.left;
+            offsetY = clientY - rect.top;
+
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('touchmove', drag, { passive: false });
+            document.addEventListener('mouseup', stopDrag);
+            document.addEventListener('touchend', stopDrag);
+            
+            // Visual feedback
+            toolbar.style.transition = 'transform 0.1s ease'; 
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            if (e.type === 'touchmove') e.preventDefault();
+
+            const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+
+            let x = clientX - offsetX;
+            let y = clientY - offsetY;
+
+            // Boundary checks
+            const maxX = window.innerWidth - toolbar.offsetWidth;
+            const maxY = window.innerHeight - toolbar.offsetHeight;
+            
+            x = Math.max(0, Math.min(x, maxX));
+            y = Math.max(0, Math.min(y, maxY));
+
+            toolbar.style.left = x + 'px';
+            toolbar.style.top = y + 'px';
+        }
+
+        function stopDrag() {
+            isDragging = false;
+            toolbar.style.transition = 'transform 0.2s cubic-bezier(0.2, 0, 0.2, 1), box-shadow 0.2s';
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('touchmove', drag);
+            document.removeEventListener('mouseup', stopDrag);
+            document.removeEventListener('touchend', stopDrag);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const rect = toolbar.getBoundingClientRect();
+            const maxX = window.innerWidth - toolbar.offsetWidth;
+            const maxY = window.innerHeight - toolbar.offsetHeight;
+            
+            if (rect.left > maxX) toolbar.style.left = maxX + 'px';
+            if (rect.top > maxY) toolbar.style.top = maxY + 'px';
+        });
+    </script>
+</body>
+</html>

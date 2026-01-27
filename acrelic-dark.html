@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows Acrylic UI Redesign</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            /* Windows 11 Fluent Design Tokens */
+            --acrylic-tint-dark: rgba(32, 32, 32, 0.65);
+            --acrylic-tint-light: rgba(255, 255, 255, 0.7);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-strong: rgba(255, 255, 255, 0.15);
+            --accent-red: #d13438;
+            --text-primary: #ffffff;
+            --font-family: 'Segoe UI Variable Display', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-family);
+            /* Forest background simulation */
+            background: linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2)), 
+                        url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=2560&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+            overflow: hidden;
+        }
+
+        /* The Main Acrylic Toolbar Container */
+        .acrylic-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: var(--acrylic-tint-dark);
+            
+            /* The Core "Acrylic" Secret: Blur + Saturation */
+            backdrop-filter: blur(20px) saturate(125%);
+            -webkit-backdrop-filter: blur(20px) saturate(125%);
+            
+            border: 1px solid var(--border-subtle);
+            border-radius: 100px; /* Pill shape */
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            
+            /* Layering logic: Separation from background */
+            position: relative;
+            z-index: 10;
+        }
+
+        /* High-contrast border for definition */
+        .acrylic-toolbar::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 100px;
+            border: 1px solid var(--border-strong);
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        /* Base Icon Button Style */
+        .tool-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+            color: var(--text-primary);
+            position: relative;
+        }
+
+        .tool-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .tool-button:active {
+            background: rgba(255, 255, 255, 0.05);
+            transform: scale(0.92);
+        }
+
+        /* Language Switcher (Red Badge) */
+        .lang-switcher {
+            background: var(--accent-red);
+            font-weight: 600;
+            font-size: 14px;
+            width: 36px;
+            height: 36px;
+            border-radius: 4px; /* Windows 11 medium rounding */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .lang-switcher:hover {
+            filter: brightness(1.1);
+            background: var(--accent-red);
+        }
+
+        /* Tooltip Simulation (Simple CSS version) */
+        .tool-button::before {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 50px;
+            background: var(--acrylic-tint-dark);
+            backdrop-filter: blur(10px);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            transform: translateY(5px);
+            transition: all 0.2s;
+            pointer-events: none;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .tool-button:hover::before {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Separator Line */
+        .separator {
+            width: 1px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+            margin: 0 4px;
+        }
+
+        /* Context Message Box */
+        .ui-label {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0,0,0,0.4);
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ui-label">Windows Fluent Design: Acrylic Material Redesign</div>
+
+    <nav class="acrylic-toolbar">
+        <!-- Language Switcher (Original Red Icon) -->
+        <div class="tool-button lang-switcher" data-tooltip="IME Switcher">
+            অ
+        </div>
+
+        <div class="separator"></div>
+
+        <!-- Display Settings -->
+        <div class="tool-button" data-tooltip="Monitor Settings">
+            <i data-lucide="monitor"></i>
+        </div>
+
+        <!-- Keyboard Settings -->
+        <div class="tool-button" data-tooltip="Input Settings">
+            <i data-lucide="keyboard"></i>
+        </div>
+
+        <!-- System Configuration -->
+        <div class="tool-button" data-tooltip="Settings">
+            <i data-lucide="settings"></i>
+        </div>
+
+        <div class="separator"></div>
+
+        <!-- Power Button -->
+        <div class="tool-button" data-tooltip="Power Options">
+            <i data-lucide="power" style="color: #ff4d4d;"></i>
+        </div>
+    </nav>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Optional: Simple interactive feedback for clicks
+        document.querySelectorAll('.tool-button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tooltip = btn.getAttribute('data-tooltip');
+                console.log(`Action triggered: ${tooltip}`);
+            });
+        });
+    </script>
+</body>
+</html>
