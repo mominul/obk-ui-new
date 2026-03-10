@@ -42,7 +42,7 @@ public:
 
 private:
     long getBuildVersion();
-    bool applyBlurBehind();
+    void applyWindowRegion();
     bool applyAcrylicAccent();
     void enableDarkMode();
     void syncOnActivate(bool active);

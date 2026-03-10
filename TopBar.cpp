@@ -267,7 +267,9 @@ void ToolButton::mouseReleaseEvent(QMouseEvent* event)
 TopBar::TopBar(QWidget* parent)
     : QWidget(parent)
 {
-    setAttribute(Qt::WA_TranslucentBackground);
+    // No WA_TranslucentBackground: non-layered window so SetWindowRgn (via setMask) works.
+    // WA_NoSystemBackground: prevent Qt from clearing the background (we paint it ourselves).
+    setAttribute(Qt::WA_NoSystemBackground);
     setWindowFlags(Qt::FramelessWindowHint | Qt::Tool | Qt::WindowStaysOnTopHint);
 
     setupUI();
@@ -365,16 +367,20 @@ void TopBar::paintEvent(QPaintEvent* event)
     path.addRoundedRect(r, radius, radius);
 
     if (m_blurActive) {
-        // Acrylic mode: DwmEnableBlurBehindWindow handles the blur region clipping.
-        // Paint the pill with the dark acrylic tint over the blur.
-        painter.fillPath(path, FluentDesign::AcrylicTintDark);
+        // Clear the entire back buffer to alpha=0 using CompositionMode_Source.
+        // DWM uses the alpha channel: alpha=0 means "show the DWM frame" (acrylic),
+        // alpha>0 means "show window content". Without Source mode, QPainter blends
+        // and never writes alpha=0 to the underlying DIB.
+        painter.setCompositionMode(QPainter::CompositionMode_Source);
+        painter.fillRect(rect(), QColor(0, 0, 0, 0));
+        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
     } else {
         // Fallback: solid dark tint (no blur available)
         painter.fillPath(path, FluentDesign::AcrylicTintDark);
     }
 
     // Draw subtle border
-    painter.setPen(QPen(FluentDesign::BorderStrong, 1));
+    painter.setPen(QPen(QColor(200, 200, 200, 80), 1));
     painter.drawPath(path);
 }
 
@@ -382,15 +388,8 @@ void TopBar::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
 
-    // Clip child widget rendering to pill shape
-    QPainterPath path;
-    path.addRoundedRect(rect(), height() / 2.0, height() / 2.0);
-    setMask(path.toFillPolygon().toPolygon());
-
-    // Update the DWM blur region to match the new pill shape
-    if (m_acrylicHelper && m_blurActive) {
-        m_acrylicHelper->updateBlurRegion();
-    }
+    // AcrylicHelper applies SetWindowRgn (pill shape) on WM_SIZE.
+    // No setMask() here to avoid conflicting with SetWindowRgn.
 }
 
 void TopBar::enableBlur()

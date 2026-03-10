@@ -94,12 +94,26 @@ bool AcrylicHelper::setAcrylicEffect(BackdropSource source, const EffectParams& 
     HWND hwnd = reinterpret_cast<HWND>(m_hwnd);
     if (!hwnd) return false;
 
+    // Add WS_THICKFRAME so DWM has a frame to extend.
+    // Qt's FramelessWindowHint uses WS_POPUP which has no DWM frame,
+    // making DwmExtendFrameIntoClientArea a no-op.
+    // We handle WM_NCCALCSIZE to hide the thick frame visually.
+    LONG style = GetWindowLongW(hwnd, GWL_STYLE);
+    SetWindowLongW(hwnd, GWL_STYLE, style | WS_THICKFRAME);
+
+    // Apply pill-shaped window region to clip the entire window (including acrylic).
+    // SetWindowRgn works on non-layered windows (no WA_TranslucentBackground).
+    applyWindowRegion();
+
     enableDarkMode();
 
-    // Use DwmEnableBlurBehindWindow with a pill-shaped region.
-    // This clips the blur to the pill shape (unlike SetWindowCompositionAttribute
-    // which always fills the entire window rect on layered windows).
-    m_effectApplied = applyBlurBehind();
+    // Extend DWM frame into the entire client area.
+    // Black pixels become transparent to the frame, revealing the acrylic.
+    MARGINS margins = {-1, -1, -1, -1};
+    DwmExtendFrameIntoClientArea(hwnd, &margins);
+
+    // Apply acrylic via accent policy.
+    m_effectApplied = applyAcrylicAccent();
     if (!m_effectApplied) return false;
 
     return true;
@@ -114,32 +128,23 @@ void AcrylicHelper::updateBlurRegion()
 {
 #ifdef Q_OS_WIN
     if (!m_hwnd || !m_effectApplied) return;
-    applyBlurBehind();
+    applyWindowRegion();
 #endif
 }
 
 #ifdef Q_OS_WIN
 
-bool AcrylicHelper::applyBlurBehind()
+void AcrylicHelper::applyWindowRegion()
 {
     HWND hwnd = reinterpret_cast<HWND>(m_hwnd);
-    if (!hwnd) return false;
+    if (!hwnd) return;
 
     int w = m_widget->width();
     int h = m_widget->height();
 
-    // Pill-shaped blur region
+    // Pill-shaped window region
     HRGN rgn = CreateRoundRectRgn(0, 0, w + 1, h + 1, h, h);
-
-    DWM_BLURBEHIND bb = {};
-    bb.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION;
-    bb.fEnable = TRUE;
-    bb.hRgnBlur = rgn;
-
-    HRESULT hr = DwmEnableBlurBehindWindow(hwnd, &bb);
-    DeleteObject(rgn);
-
-    return SUCCEEDED(hr);
+    SetWindowRgn(hwnd, rgn, TRUE);  // OS takes ownership of rgn, do NOT DeleteObject
 }
 
 bool AcrylicHelper::applyAcrylicAccent()
@@ -180,7 +185,7 @@ void AcrylicHelper::syncOnActivate(bool active)
 {
     m_active = active;
     if (m_effectApplied) {
-        applyBlurBehind();
+        applyAcrylicAccent();
     }
 }
 
@@ -189,19 +194,43 @@ void AcrylicHelper::syncOnActivate(bool active)
 bool AcrylicHelper::nativeEventFilter(const QByteArray& eventType, void* message, long* result)
 {
 #ifdef Q_OS_WIN
-    if (m_hwnd && m_effectApplied && eventType == "windows_generic_MSG") {
+    if (eventType == "windows_generic_MSG") {
         MSG* msg = static_cast<MSG*>(message);
 
-        if (msg->hwnd == reinterpret_cast<HWND>(m_hwnd)) {
+        if (m_hwnd && msg->hwnd == reinterpret_cast<HWND>(m_hwnd)) {
             switch (msg->message) {
-            case WM_ACTIVATE: {
-                WORD state = LOWORD(msg->wParam);
-                bool active = (state == WA_ACTIVE || state == WA_CLICKACTIVE);
-                syncOnActivate(active);
+            case WM_NCCALCSIZE:
+                // Make client area = entire window (hides the WS_THICKFRAME border).
+                if (msg->wParam == TRUE) {
+                    *result = 0;
+                    return true;
+                }
                 break;
+
+            case WM_ERASEBKGND:
+                // Prevent the system from erasing the background.
+                *result = 1;
+                return true;
+
+            case WM_NCHITTEST: {
+                // Prevent resize cursors from the thick frame.
+                // Return HTCLIENT for all areas.
+                *result = HTCLIENT;
+                return true;
             }
+
+            case WM_ACTIVATE:
+                if (m_effectApplied) {
+                    WORD state = LOWORD(msg->wParam);
+                    bool active = (state == WA_ACTIVE || state == WA_CLICKACTIVE);
+                    syncOnActivate(active);
+                }
+                break;
+
             case WM_SIZE:
-                updateBlurRegion();
+                if (m_effectApplied) {
+                    updateBlurRegion();
+                }
                 break;
             }
         }
