@@ -8,6 +8,8 @@
 #include <QFrame>
 #include <QPoint>
 
+class AcrylicHelper;
+
 // Icon types for tool buttons
 enum class IconType {
     None,
@@ -83,8 +85,9 @@ private slots:
 private:
     QFrame* createSeparator();
     void setupUI();
-    void applyPlatformBlur();
 
+    AcrylicHelper* m_acrylicHelper = nullptr;
+    bool m_blurActive = false;
     QHBoxLayout* m_layout;
     ToolButton* m_langSwitcher;
     ToolButton* m_monitorBtn;

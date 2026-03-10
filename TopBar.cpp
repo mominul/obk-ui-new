@@ -1,4 +1,5 @@
 #include "TopBar.h"
+#include "AcrylicHelper.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -8,30 +9,8 @@
 #include <QApplication>
 #include <QProcess>
 
-#ifdef Q_OS_WIN
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
-#endif
-#include <windows.h>
-#include <dwmapi.h>
-#pragma comment(lib, "dwmapi.lib")
-#pragma comment(lib, "user32.lib")
-
-typedef struct {
-    DWORD AccentState;
-    DWORD AccentFlags;
-    DWORD GradientColor;
-    DWORD AnimationId;
-} ACCENTPOLICY;
-
-typedef struct {
-    int Attribute;
-    PVOID Data;
-    SIZE_T SizeOfData;
-} WINDOWCOMPOSITIONATTRIBDATA;
-
-typedef BOOL (WINAPI *pfnSetWindowCompositionAttribute)(HWND, WINDOWCOMPOSITIONATTRIBDATA*);
-
 #endif
 
 #ifdef Q_OS_MAC
@@ -292,10 +271,6 @@ TopBar::TopBar(QWidget* parent)
     setWindowFlags(Qt::FramelessWindowHint | Qt::Tool | Qt::WindowStaysOnTopHint);
 
     setupUI();
-
-    // Note: Do NOT use QGraphicsDropShadowEffect on the parent widget
-    // as it prevents child widgets from rendering properly.
-    // Shadow is drawn manually in paintEvent instead.
 }
 
 TopBar::~TopBar() = default;
@@ -384,14 +359,21 @@ void TopBar::paintEvent(QPaintEvent* event)
 
     painter.setRenderHint(QPainter::Antialiasing);
 
-    // Pill-shaped background
     QPainterPath path;
     QRectF r = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
-    qreal radius = r.height() / 2.0;  // Perfect pill shape
+    qreal radius = r.height() / 2.0;
     path.addRoundedRect(r, radius, radius);
 
-    // Fill with acrylic tint
-    painter.fillPath(path, FluentDesign::AcrylicTintDark);
+    if (m_blurActive) {
+        // Acrylic mode: fill the pill area with a minimal-alpha color.
+        // The accent policy's GradientColor provides the dark tint over the blur.
+        // We just need alpha > 0 so the pill area is "visible" to DWM and the
+        // acrylic renders here. Corners stay alpha=0 (transparent/click-through).
+        painter.fillPath(path, QColor(0, 0, 0, 1));
+    } else {
+        // Fallback: solid dark tint (no blur available)
+        painter.fillPath(path, FluentDesign::AcrylicTintDark);
+    }
 
     // Draw subtle border
     painter.setPen(QPen(FluentDesign::BorderStrong, 1));
@@ -405,50 +387,23 @@ void TopBar::resizeEvent(QResizeEvent* event)
 
 void TopBar::enableBlur()
 {
-    applyPlatformBlur();
-}
-
-void TopBar::applyPlatformBlur()
-{
 #ifdef Q_OS_WIN
-    // Windows 10/11 Acrylic Blur using SetWindowCompositionAttribute
-    HWND hwnd = reinterpret_cast<HWND>(winId());
+    // Use AcrylicHelper (API inspired by Win32-Acrylic-Effect's AcrylicCompositor)
+    m_acrylicHelper = new AcrylicHelper(this, this);
 
-    HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
-    if (hUser32) {
-        pfnSetWindowCompositionAttribute setWindowCompositionAttribute =
-            (pfnSetWindowCompositionAttribute)GetProcAddress(hUser32, "SetWindowCompositionAttribute");
+    AcrylicHelper::EffectParams params;
+    // Design tokens from acrelic-dark.html
+    params.blurAmount      = 20.0f;                        // backdrop-filter: blur(20px)
+    params.saturationAmount = 1.25f;                       // saturate(125%)
+    params.tintColor       = FluentDesign::AcrylicTintDark; // rgba(32, 32, 32, 0.65)
+    params.fallbackColor   = QColor(32, 32, 32, 255);
 
-        if (setWindowCompositionAttribute) {
-            ACCENTPOLICY accent = {0};
-            accent.AccentState = 4;  // ACCENT_ENABLE_ACRYLICBLURBEHIND
-            accent.AccentFlags = 2;  // ACCENT_ENABLE_TRANSPARENTGRADIENT
-            // Gradient color: AABBGGRR format (alpha, blue, green, red)
-            accent.GradientColor = 0xA6202020; // Dark tint with ~65% alpha
-
-            WINDOWCOMPOSITIONATTRIBDATA data = {0};
-            data.Attribute = 19;  // WCA_ACCENT_POLICY
-            data.Data = &accent;
-            data.SizeOfData = sizeof(accent);
-
-            setWindowCompositionAttribute(hwnd, &data);
-
-            // Enable dark mode
-            data.Attribute = 26;  // WCA_USEDARKMODECOLORS
-            setWindowCompositionAttribute(hwnd, &data);
-        }
-    }
-
-    // Extend frame into client area for better blur effect
-    MARGINS margins = {-1, -1, -1, -1};
-    DwmExtendFrameIntoClientArea(hwnd, &margins);
+    m_blurActive = m_acrylicHelper->setAcrylicEffect(AcrylicHelper::HostBackdrop, params);
 
 #elif defined(Q_OS_MAC)
-    // macOS blur using NSVisualEffectView is handled in Objective-C++
     enableMacOSBlur(reinterpret_cast<void*>(winId()));
 
 #elif defined(Q_OS_LINUX)
-    // Linux KDE blur using xprop
     WId wid = winId();
     QString command = QString("xprop -f _KDE_NET_WM_BLUR_BEHIND_REGION 32c "
                               "-set _KDE_NET_WM_BLUR_BEHIND_REGION 0 -id %1").arg(wid);

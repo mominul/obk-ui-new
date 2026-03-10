@@ -15,9 +15,6 @@ int main(int argc, char *argv[])
     // Create the toolbar
     TopBar topBar;
 
-    // Enable platform-specific blur effect
-    topBar.enableBlur();
-
     // Connect signals for demonstration
     QObject::connect(&topBar, &TopBar::languageSwitcherClicked, []() {
         qDebug() << "Language switcher clicked";
@@ -49,6 +46,11 @@ int main(int argc, char *argv[])
 
     topBar.move(x, y);
     topBar.show();
+
+    // Enable acrylic blur AFTER show() so the platform window is fully created.
+    // Calling winId() before show() with FramelessWindowHint|Tool can cause
+    // recursive CreateWindowEx failures.
+    topBar.enableBlur();
 
     return app.exec();
 }

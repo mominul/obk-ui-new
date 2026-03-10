@@ -21,6 +21,12 @@ set(HEADERS
     TopBar.h
 )
 
+# Windows acrylic helper (API inspired by Win32-Acrylic-Effect)
+if(WIN32)
+    list(APPEND SOURCES AcrylicHelper.cpp)
+    list(APPEND HEADERS AcrylicHelper.h)
+endif()
+
 # Platform-specific sources
 if(APPLE)
     # Enable Objective-C++ for macOS
