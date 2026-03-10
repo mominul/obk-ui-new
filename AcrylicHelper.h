@@ -34,18 +34,17 @@ public:
     // Main API - mirrors AcrylicCompositor::SetAcrylicEffect
     bool setAcrylicEffect(BackdropSource source, const EffectParams& params);
 
-    // Update the pill-shaped clip region (call after resize)
-    void updateClipRegion();
+    // Update the pill-shaped blur region (call after resize)
+    void updateBlurRegion();
 
     // QAbstractNativeEventFilter - mirrors AcrylicCompositor::Sync
     bool nativeEventFilter(const QByteArray& eventType, void* message, long* result) override;
 
 private:
     long getBuildVersion();
+    bool applyBlurBehind();
     bool applyAcrylicAccent();
-    bool applyWin11Backdrop();
     void enableDarkMode();
-    void extendFrame();
     void syncOnActivate(bool active);
 
     QWidget* m_widget;

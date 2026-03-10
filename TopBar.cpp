@@ -365,11 +365,9 @@ void TopBar::paintEvent(QPaintEvent* event)
     path.addRoundedRect(r, radius, radius);
 
     if (m_blurActive) {
-        // Acrylic mode: fill the pill area with a minimal-alpha color.
-        // The accent policy's GradientColor provides the dark tint over the blur.
-        // We just need alpha > 0 so the pill area is "visible" to DWM and the
-        // acrylic renders here. Corners stay alpha=0 (transparent/click-through).
-        painter.fillPath(path, QColor(0, 0, 0, 1));
+        // Acrylic mode: DwmEnableBlurBehindWindow handles the blur region clipping.
+        // Paint the pill with the dark acrylic tint over the blur.
+        painter.fillPath(path, FluentDesign::AcrylicTintDark);
     } else {
         // Fallback: solid dark tint (no blur available)
         painter.fillPath(path, FluentDesign::AcrylicTintDark);
@@ -383,6 +381,16 @@ void TopBar::paintEvent(QPaintEvent* event)
 void TopBar::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
+
+    // Clip child widget rendering to pill shape
+    QPainterPath path;
+    path.addRoundedRect(rect(), height() / 2.0, height() / 2.0);
+    setMask(path.toFillPolygon().toPolygon());
+
+    // Update the DWM blur region to match the new pill shape
+    if (m_acrylicHelper && m_blurActive) {
+        m_acrylicHelper->updateBlurRegion();
+    }
 }
 
 void TopBar::enableBlur()
